@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <io.h>
+#include <direct.h>
 #ifdef _MSC_VER
 
 #else
@@ -975,6 +977,21 @@ void strip_ext(char *fname){
 	}
 }
 
+void get_and_create_dir(char *fdir, char *fname) {
+	char *end = fname + strlen(fname);
+	while (end > fname && *end != '\\' && *end != '/') {
+		--end;
+	}
+	if (end == fname || *(end - 1) != '\\' || *(end - 1) != '/') {
+	    strncpy(fdir, fname, end - fname);
+	}
+  // 文件夹不存在则创建文件夹
+  if (_access(fdir, 0) == -1)
+  {
+    _mkdir(fdir);
+  }
+}
+
 int save_mesh(const char *fnm, vec3i *tris, vec3d *pts, int ntri, int npt, bool isGz){
 	char basenm[768], ext[768] = "";
 	strcpy(basenm, fnm);
@@ -1015,6 +1032,21 @@ double sform(vec3d p, float srow[4]) {
 }
 
 void apply_sform(vec3i *t, vec3d *p, int nt, int np, float srow_x[4], float srow_y[4], float srow_z[4]){
+	if (srow_x[0] < 0) {
+		for (int i = 0; i < 4; i++) {
+			srow_x[i] = -srow_x[i];
+		}
+	}
+	if (srow_y[1] < 0) {
+		for (int i = 0; i < 4; i++) {
+			srow_y[i] = -srow_y[i];
+		}
+	}
+	if (srow_z[2] < 0) {
+		for (int i = 0; i < 4; i++) {
+			srow_z[i] = -srow_z[i];
+		}
+	}
 	for (int i = 0; i < np; i++) {
 		vec3d v = p[i];
 		p[i].x = sform(v, srow_x);

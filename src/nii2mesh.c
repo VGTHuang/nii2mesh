@@ -101,6 +101,43 @@ float * load_nii(const char *fnm, nifti_1_header * hdr) {
 			return NULL;
 		}
 	}
+	// print some metadata...
+	printf("dim: ");
+	for (int i = 0; i < 8; i++) {
+		printf("%f ", hdr->dim[i]);
+	}
+	printf("\npixdim: ");
+	for (int i = 0; i < 8; i++) {
+		printf("%f ", hdr->pixdim[i]);
+	}
+	printf("\n quaternion: ");
+	printf("%f %f %f %f %f %f", hdr->quatern_b, hdr->quatern_c, hdr->quatern_d, hdr->qoffset_x, hdr->qoffset_y, hdr->qoffset_z);
+	printf("\n srow_x: ");
+	for (int i = 0; i < 4; i++) {
+		printf("%f ", hdr->srow_x[i]);
+	}
+	printf("\n srow_y: ");
+	for (int i = 0; i < 4; i++) {
+		printf("%f ", hdr->srow_y[i]);
+	}
+	printf("\n srow_z: ");
+	for (int i = 0; i < 4; i++) {
+		printf("%f ", hdr->srow_z[i]);
+	}
+	printf("\n");
+	if (hdr->srow_x[0] == 0) {
+		hdr->srow_x[0] = -hdr->pixdim[1];
+		hdr->srow_x[3] = hdr->qoffset_x;
+	}
+	if (hdr->srow_y[1] == 0) {
+		hdr->srow_y[1] = -hdr->pixdim[2];
+		hdr->srow_y[3] = hdr->qoffset_y;
+	}
+	if (hdr->srow_z[2] == 0) {
+		hdr->srow_z[2] = hdr->pixdim[3];
+		hdr->srow_z[3] = hdr->qoffset_z;
+	}
+	// print end
 	uint16_t sig = 348;
 	uint16_t fwd = hdr->sizeof_hdr;
 	uint16_t rev = (fwd & 0xff) << 8 | ((fwd & 0xff00) >> 8);
@@ -310,7 +347,7 @@ int main(int argc,char **argv) {
 			exit(EXIT_FAILURE);
 		}
 		int nLabel = trunc(mx);
-		char basenm[mxStr], ext[mxStr] = "";
+		char basenm[mxStr], ext[mxStr] = "", fdir[mxStr] = "";
 		//look for text file, e.g. atlas.nii.gz -> atlas.txt
 		#define kLabelStrLen 32
 		typedef struct  {
@@ -319,8 +356,8 @@ int main(int argc,char **argv) {
 		tstr *atlasLabels = (tstr *) malloc((nLabel+1) * sizeof(tstr));
 		//We need to use a struct to support MSVC C90, with gcc and clang:
 		//  char atlasLabels[nLabel+1][kLabelStrLen];
-		for (int i = 0; i <= nLabel; i++)
-			snprintf (atlasLabels[i].str, kLabelStrLen-1, "%d", i);
+		// for (int i = 0; i <= nLabel; i++)
+		// 	snprintf (atlasLabels[i].str, kLabelStrLen-1, "%d", i);
 		if (strcmp("1", atlasFilename) != 0) {
 			FILE *fp = fopen(atlasFilename,"rt");
 			if (fp == NULL) {
@@ -332,7 +369,8 @@ int main(int argc,char **argv) {
 					int i = atoi(s);
 					if ((i < 0) || (i > nLabel)) continue;
 					strncpy(s, strtok(NULL,";"), mxStr);
-					int len = snprintf (atlasLabels[i].str, kLabelStrLen-1, "%s.k%d", s, i);
+					s[strlen(s)-1]='\0';
+					int len = snprintf (atlasLabels[i].str, kLabelStrLen-1, "%s", s);
 					if (len < 0) exit(EXIT_FAILURE);
 					//remove illegal characters, e.g. 'PACo/Pir' -> 'PACo-Pir'
 					if (len < 1) continue;
@@ -345,7 +383,12 @@ int main(int argc,char **argv) {
 		}
 		//next, parse name and extension for output files
 		strcpy(basenm, argv[argc-1]);
+		printf("1: %s\n", basenm);
 		strip_ext(basenm); // ~/file.nii -> ~/file
+		get_and_create_dir(fdir, basenm);
+		// mkdir
+
+		printf("2: %s\n", basenm);
 		if (strlen(argv[argc-1]) > strlen(basenm))
 			strcpy(ext, argv[argc-1] + strlen(basenm));
 		#if defined(_OPENMP) //compile with 'OMP=1 make -j'
@@ -377,7 +420,7 @@ int main(int argc,char **argv) {
 					continue;
 				}
 				char outnm[mxStr];
-				if (snprintf(outnm,sizeof(outnm),"%s%s%s", basenm, atlasLabels[i].str, ext) < 0) exit(EXIT_FAILURE);
+				if (snprintf(outnm,sizeof(outnm),"%s/%s%s", fdir, atlasLabels[i].str, ext) < 0) exit(EXIT_FAILURE);
 				int reti = nii2(hdr, imgbinary, originalMC, 0.5, reduceFraction, preSmooth, onlyLargest, fillBubbles, postSmooth, verbose, outnm, quality);
 				if (reti == EXIT_SUCCESS)
 					partial_OK ++;
